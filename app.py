@@ -1,5 +1,4 @@
 import logging
-import threading
 import random
 import string
 import time
@@ -20,6 +19,9 @@ RCON_HOST = "proxima.minerent.net"
 RCON_PORT = 25811
 RCON_PASSWORD = "sanumxxx"
 WEBAPP_URL = "https://univappschedule.ru"
+
+# === Flask приложение ===
+flask_app = Flask(__name__)
 
 # === База данных ===
 DB_PATH = "minecraft_clicker.db"
@@ -210,54 +212,62 @@ def get_user_stats():
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    cursor.execute("SELECT COUNT(*) as total FROM users")
-    total = cursor.fetchone()['total']
+    # Общее количество пользователей
+    cursor.execute("SELECT COUNT(*) FROM users")
+    total_users = cursor.fetchone()[0]
     
-    cursor.execute("SELECT COUNT(*) as verified FROM users WHERE verified = 1")
-    verified = cursor.fetchone()['verified']
+    # Количество верифицированных пользователей
+    cursor.execute("SELECT COUNT(*) FROM users WHERE verified = 1")
+    verified_users = cursor.fetchone()[0]
+    
+    # Количество активных кодов
+    cursor.execute("SELECT COUNT(*) FROM verification_codes WHERE expires_at > ?", (time.time(),))
+    active_codes = cursor.fetchone()[0]
     
     conn.close()
     
     return {
-        'total_users': total,
-        'verified_users': verified,
-        'unverified_users': total - verified
+        "total_users": total_users,
+        "verified_users": verified_users,
+        "active_codes": active_codes
     }
 
-# === Flask-приложение ===
-flask_app = Flask(__name__)
-
+# === Flask маршруты ===
 @flask_app.route("/")
 def index():
     return render_template("index.html")
 
 @flask_app.route("/api/register", methods=["POST"])
 def register():
-    """Регистрация нового пользователя с вводом ника"""
+    """Регистрация пользователя и отправка кода в игру"""
     data = request.get_json()
     user_id = data.get("user_id")
     nickname = data.get("nickname", "").strip()
 
     if not user_id or not nickname:
-        return jsonify({"error": "Необходимо указать ник"}), 400
+        return jsonify({"error": "Необходимо указать никнейм"}), 400
 
-    # Проверяем валидность ника Minecraft (3-16 символов, буквы и цифры)
-    if not (3 <= len(nickname) <= 16) or not nickname.replace("_", "").isalnum():
-        return jsonify({"error": "Неверный формат ника Minecraft"}), 400
+    # Проверяем никнейм
+    if len(nickname) < 3 or len(nickname) > 16:
+        return jsonify({"error": "Никнейм должен быть от 3 до 16 символов"}), 400
 
-    # Проверяем, существует ли уже пользователь
-    existing_user = get_user_by_telegram_id(user_id)
-    if existing_user:
-        # Обновляем ник если изменился
-        if existing_user['nickname'] != nickname:
-            conn = get_db_connection()
-            cursor = conn.cursor()
-            cursor.execute(
-                "UPDATE users SET nickname = ?, verified = 0 WHERE telegram_id = ?",
-                (nickname, user_id)
-            )
-            conn.commit()
-            conn.close()
+    # Очищаем устаревшие коды
+    cleanup_expired_codes()
+
+    # Проверяем существующего пользователя
+    user = get_user_by_telegram_id(user_id)
+    if user:
+        if user['verified']:
+            return jsonify({"error": "Вы уже зарегистрированы и верифицированы"}), 400
+        # Обновляем никнейм если пользователь не верифицирован
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE users SET nickname = ? WHERE telegram_id = ?",
+            (nickname, user_id)
+        )
+        conn.commit()
+        conn.close()
     else:
         # Создаем нового пользователя
         create_user(user_id, nickname)
@@ -391,69 +401,18 @@ def stats():
     stats_data = get_user_stats()
     return jsonify(stats_data)
 
-# === Telegram-бот ===
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    user = get_user_by_telegram_id(user_id)
-    
-    if user and user['verified']:
-        await update.message.reply_text(
-            f"Привет, {user['nickname']}! 🎮\n"
-            f"Ты уже зарегистрирован и верифицирован.\n"
-            f"Нажми /clicker чтобы открыть игру!"
-        )
-    else:
-        await update.message.reply_text(
-            "Привет! 👋\n"
-            "Добро пожаловать в Minecraft Кликер!\n"
-            "Нажми /clicker чтобы начать регистрацию."
-        )
-
-async def open_clicker(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [[
-        InlineKeyboardButton(
-            "🚀 Открыть кликер",
-            web_app=WebAppInfo(url=WEBAPP_URL)
-        )
-    ]]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text("Нажми кнопку, чтобы открыть кликер:", reply_markup=reply_markup)
-
-# === Фоновые задачи ===
-def background_cleanup():
-    """Фоновая очистка устаревших кодов"""
-    while True:
-        try:
-            cleanup_expired_codes()
-            time.sleep(300)  # Каждые 5 минут
-        except Exception as e:
-            print(f"Ошибка в фоновой очистке: {e}")
-            time.sleep(60)
-
-# === Фоновый запуск Flask-сервера ===
-def run_flask():
-    flask_app.run(host="0.0.0.0", port=5000)
-
-# === Запуск Telegram-бота и Flask ===
-def main():
+# === Запуск только Flask (без Telegram бота) ===
+if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     
     # Инициализируем базу данных
     init_database()
     
-    # Запускаем фоновую очистку
-    threading.Thread(target=background_cleanup, daemon=True).start()
+    # Очищаем устаревшие коды при запуске
+    cleanup_expired_codes()
     
-    # Запускаем Flask сервер
-    threading.Thread(target=run_flask, daemon=True).start()
-
-    app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("clicker", open_clicker))
-
-    print("✅ Flask и Telegram-бот запущены")
+    print("✅ Flask сервер запущен")
     print(f"📊 Статистика: {get_user_stats()}")
-    app.run_polling()
-
-if __name__ == "__main__":
-    main()
+    
+    # Запускаем только Flask без потоков
+    flask_app.run(host="0.0.0.0", port=5000, debug=False) 
