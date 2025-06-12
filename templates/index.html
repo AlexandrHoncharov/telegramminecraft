@@ -1,0 +1,928 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Minecraft Кликер</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+    }
+
+    html {
+      -webkit-text-size-adjust: 100%;
+      -ms-text-size-adjust: 100%;
+      touch-action: manipulation;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+      color: white;
+      min-height: 100vh;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      touch-action: manipulation;
+    }
+
+    .background-decoration {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: -1;
+    }
+
+    .floating-icon {
+      position: absolute;
+      opacity: 0.08;
+      font-size: 1.5rem;
+      animation: float 8s ease-in-out infinite;
+    }
+
+    .floating-icon:nth-child(1) { top: 15%; left: 10%; animation-delay: -1s; }
+    .floating-icon:nth-child(2) { top: 25%; right: 15%; animation-delay: -2s; }
+    .floating-icon:nth-child(3) { bottom: 25%; left: 20%; animation-delay: -3s; }
+    .floating-icon:nth-child(4) { bottom: 15%; right: 10%; animation-delay: -4s; }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0px) rotate(0deg); }
+      50% { transform: translateY(-15px) rotate(3deg); }
+    }
+    
+    .container {
+      max-width: 400px;
+      margin: 0 auto;
+      padding: 15px;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .app-card {
+      background: rgba(255, 255, 255, 0.15);
+      backdrop-filter: blur(20px);
+      border-radius: 20px;
+      padding: 25px;
+      box-shadow: 
+        0 8px 32px rgba(31, 38, 135, 0.37),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      width: 100%;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .app-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+    }
+
+    .server-badge {
+      display: inline-block;
+      background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%);
+      color: white;
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 12px;
+      box-shadow: 0 2px 8px rgba(255, 107, 107, 0.3);
+    }
+    
+    h1 {
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: 6px;
+      text-align: center;
+      background: linear-gradient(135deg, #fff 0%, #f0f8ff 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    .subtitle {
+      text-align: center;
+      opacity: 0.8;
+      margin-bottom: 25px;
+      font-size: 14px;
+      font-weight: 400;
+    }
+    
+    .screen {
+      display: none;
+      animation: fadeIn 0.3s ease-in-out;
+    }
+    
+    .screen.active {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(15px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .input-group {
+      margin: 20px 0;
+      position: relative;
+    }
+
+    .input-label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: 500;
+      font-size: 13px;
+      opacity: 0.9;
+    }
+    
+    input {
+      width: 100%;
+      padding: 14px 18px;
+      padding-left: 45px;
+      border: none;
+      border-radius: 14px;
+      font-size: 16px;
+      font-weight: 500;
+      background: rgba(255, 255, 255, 0.9);
+      color: #2d3748;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      touch-action: manipulation;
+      -webkit-user-select: text;
+      -moz-user-select: text;
+      -ms-user-select: text;
+      user-select: text;
+    }
+
+    input::placeholder {
+      color: #a0aec0;
+      font-weight: 400;
+    }
+
+    input:focus {
+      outline: none;
+      background: rgba(255, 255, 255, 0.95);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+      transform: translateY(-1px);
+    }
+
+    .input-icon {
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #667eea;
+      font-size: 16px;
+      z-index: 1;
+    }
+
+    .btn {
+      width: 100%;
+      padding: 14px;
+      margin: 10px 0;
+      font-size: 15px;
+      font-weight: 600;
+      border: none;
+      border-radius: 14px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      position: relative;
+      overflow: hidden;
+      text-transform: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .btn::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+      transition: left 0.4s;
+    }
+
+    .btn:active::before {
+      left: 100%;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+      color: white;
+      box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+    }
+
+    .btn-primary:active {
+      transform: translateY(1px);
+      box-shadow: 0 2px 10px rgba(76, 175, 80, 0.4);
+    }
+
+    .btn-secondary {
+      background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%);
+      color: white;
+      box-shadow: 0 4px 15px rgba(108, 117, 125, 0.3);
+    }
+
+    .btn-info {
+      background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+      color: white;
+      box-shadow: 0 4px 15px rgba(23, 162, 184, 0.3);
+    }
+
+    .btn:active {
+      transform: translateY(1px);
+    }
+    
+    .tap-section {
+      text-align: center;
+      margin: 25px 0;
+    }
+
+    .tap-encouragement {
+      font-size: 16px;
+      font-weight: 600;
+      color: #ffed4e;
+      margin-bottom: 15px;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.8; transform: scale(1.02); }
+    }
+    
+    .tap-button {
+      width: 140px;
+      height: 140px;
+      border-radius: 50%;
+      font-size: 18px;
+      font-weight: 700;
+      background: linear-gradient(135deg, #FF6B6B 0%, #FF8E53 50%, #FF6B6B 100%);
+      margin: 15px auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 
+        0 6px 25px rgba(255, 107, 107, 0.35),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+      position: relative;
+      overflow: hidden;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .tap-button::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle, rgba(255,255,255,0.3) 0%, transparent 70%);
+      transform: scale(0);
+      transition: transform 0.2s ease;
+    }
+
+    .tap-button:active::before {
+      transform: scale(1);
+    }
+
+    .tap-button:active {
+      transform: scale(0.95);
+      box-shadow: 
+        0 3px 15px rgba(255, 107, 107, 0.5),
+        inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    }
+
+    .tap-icon {
+      font-size: 36px;
+      margin-bottom: 6px;
+      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
+    }
+
+    .tap-text {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    .score-display {
+      background: rgba(255, 255, 255, 0.1);
+      padding: 16px;
+      border-radius: 16px;
+      margin: 20px 0;
+      text-align: center;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      backdrop-filter: blur(10px);
+    }
+
+    .score-label {
+      font-size: 12px;
+      opacity: 0.8;
+      margin-bottom: 6px;
+      font-weight: 500;
+    }
+
+    .score-value {
+      font-size: 28px;
+      font-weight: 700;
+      background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      transition: transform 0.2s ease;
+    }
+
+    .player-info {
+      background: rgba(255, 255, 255, 0.1);
+      padding: 14px;
+      border-radius: 14px;
+      margin: 15px 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .player-avatar {
+      width: 42px;
+      height: 42px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .player-details h3 {
+      font-size: 15px;
+      font-weight: 600;
+      margin-bottom: 3px;
+    }
+
+    .player-details p {
+      font-size: 11px;
+      opacity: 0.7;
+      font-weight: 400;
+    }
+    
+    .message {
+      margin: 16px 0;
+      padding: 12px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      animation: slideIn 0.3s ease;
+    }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .message.error {
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      color: #fca5a5;
+    }
+    
+    .message.success {
+      background: rgba(34, 197, 94, 0.15);
+      border: 1px solid rgba(34, 197, 94, 0.3);
+      color: #86efac;
+    }
+
+    .loading-spinner {
+      width: 32px;
+      height: 32px;
+      border: 3px solid rgba(255, 255, 255, 0.3);
+      border-top: 3px solid #fff;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 16px auto;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .feature-list {
+      list-style: none;
+      margin: 20px 0;
+    }
+
+    .feature-list li {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 0;
+      font-size: 13px;
+      opacity: 0.9;
+    }
+
+    .feature-list li i {
+      color: #4CAF50;
+      font-size: 14px;
+      width: 16px;
+      flex-shrink: 0;
+    }
+
+    /* Дополнительная оптимизация для iOS */
+    @supports (-webkit-touch-callout: none) {
+      .tap-button {
+        -webkit-tap-highlight-color: transparent;
+        -webkit-touch-callout: none;
+      }
+      
+      input {
+        -webkit-appearance: none;
+        border-radius: 14px;
+      }
+    }
+
+    /* Оптимизация для Android */
+    @media screen and (-webkit-min-device-pixel-ratio: 0) {
+      .tap-button:active {
+        background: linear-gradient(135deg, #ff5252 0%, #ff7043 50%, #ff5252 100%);
+      }
+    }
+
+    @media (max-width: 380px) {
+      .container {
+        padding: 10px;
+      }
+      
+      .app-card {
+        padding: 20px;
+      }
+      
+      .tap-button {
+        width: 130px;
+        height: 130px;
+        font-size: 16px;
+      }
+      
+      .tap-icon {
+        font-size: 32px;
+      }
+
+      h1 {
+        font-size: 22px;
+      }
+
+      .score-value {
+        font-size: 24px;
+      }
+    }
+
+    @media (max-height: 600px) {
+      .container {
+        padding: 8px;
+      }
+      
+      .app-card {
+        padding: 18px;
+      }
+      
+      .input-group {
+        margin: 15px 0;
+      }
+      
+      .tap-section {
+        margin: 20px 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="background-decoration">
+    <i class="fas fa-cube floating-icon"></i>
+    <i class="fas fa-pickaxe floating-icon"></i>
+    <i class="fas fa-gem floating-icon"></i>
+    <i class="fas fa-coins floating-icon"></i>
+  </div>
+
+  <div class="container">
+    <div class="app-card">
+      <!-- Экран загрузки -->
+      <div id="loading-screen" class="screen active">
+        <div style="text-align: center;">
+          <div class="server-badge">
+            <i class="fas fa-server"></i> Сервер ПИКМЭ
+          </div>
+        </div>
+        <h1><i class="fas fa-cube"></i> Minecraft Кликер</h1>
+        <p class="subtitle">Подключение к серверу...</p>
+        <div class="loading-spinner"></div>
+        <div id="loading-message"></div>
+      </div>
+
+      <!-- Экран регистрации -->
+      <div id="register-screen" class="screen">
+        <div style="text-align: center;">
+          <div class="server-badge">
+            <i class="fas fa-server"></i> Сервер ПИКМЭ
+          </div>
+        </div>
+        <h1><i class="fas fa-user-plus"></i> Добро пожаловать!</h1>
+        <p class="subtitle">Зарегистрируйтесь для начала игры</p>
+        
+       
+
+        <div class="input-group">
+          <label class="input-label">Игровой ник</label>
+          <div style="position: relative;">
+            <i class="fas fa-user input-icon"></i>
+            <input type="text" id="nickname-input" placeholder="Введите Minecraft ник" maxlength="16">
+          </div>
+        </div>
+        
+        <button class="btn btn-primary" onclick="register()">
+          <i class="fas fa-arrow-right"></i>
+          Зарегистрироваться
+        </button>
+        
+        <div id="register-message"></div>
+      </div>
+
+      <!-- Экран верификации -->
+      <div id="verify-screen" class="screen">
+        <div style="text-align: center;">
+          <div class="server-badge">
+            <i class="fas fa-server"></i> Сервер ПИКМЭ
+          </div>
+        </div>
+        <h1><i class="fas fa-shield-alt"></i> Подтверждение</h1>
+        <p class="subtitle">Проверьте игру и введите код</p>
+        
+        <div class="message" style="background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.3); color: #93c5fd;">
+          <i class="fas fa-info-circle"></i>
+          <span>Код появился на экране в игре. Введите его ниже.</span>
+        </div>
+
+        <div class="input-group">
+          <label class="input-label">Код подтверждения</label>
+          <div style="position: relative;">
+            <i class="fas fa-key input-icon"></i>
+            <input type="text" id="code-input" placeholder="Введите 6-значный код" maxlength="6" pattern="[0-9]{6}">
+          </div>
+        </div>
+        
+        <button class="btn btn-primary" onclick="verify()">
+          <i class="fas fa-check"></i>
+          Подтвердить
+        </button>
+        
+        <button class="btn btn-secondary" onclick="showRegisterScreen()">
+          <i class="fas fa-arrow-left"></i>
+          Назад
+        </button>
+        
+        <div id="verify-message"></div>
+      </div>
+
+      <!-- Экран игры -->
+      <div id="game-screen" class="screen">
+        <div style="text-align: center;">
+          <div class="server-badge">
+            <i class="fas fa-server"></i> Сервер ПИКМЭ
+          </div>
+        </div>
+        <h1><i class="fas fa-gamepad"></i> Minecraft Кликер</h1>
+        
+        <div class="player-info">
+          <div class="player-avatar">
+            <i class="fas fa-user"></i>
+          </div>
+          <div class="player-details">
+            <h3 id="player-nickname">Игрок</h3>
+            <p>Верифицированный игрок</p>
+          </div>
+        </div>
+
+        <div class="score-display">
+          <div class="score-label">Ваши очки</div>
+          <div class="score-value" id="score">0</div>
+        </div>
+        
+        <div class="tap-section">
+          <div class="tap-encouragement">
+            <i class="fas fa-heart"></i> Друзяки, тапайте! <i class="fas fa-heart"></i>
+          </div>
+          <button class="tap-button" onclick="tap()">
+            <i class="fas fa-pickaxe tap-icon"></i>
+            <div class="tap-text">КОПАТЬ!</div>
+          </button>
+        </div>
+        
+        <button class="btn btn-info" onclick="updateBalance()">
+          <i class="fas fa-sync-alt"></i>
+          Обновить счёт
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const tg = window.Telegram.WebApp;
+    tg.expand();
+
+    const user_id = tg.initDataUnsafe?.user?.id;
+    let currentScreen = 'loading-screen';
+
+    if (!user_id) {
+      showMessage('loading-screen', "Ошибка: Не удалось получить данные пользователя", 'error');
+    } else {
+      checkUserStatus();
+    }
+
+    function showScreen(screenId) {
+      document.querySelectorAll('.screen').forEach(screen => {
+        screen.classList.remove('active');
+      });
+      document.getElementById(screenId).classList.add('active');
+      currentScreen = screenId;
+    }
+
+    function showMessage(screenId, message, type = '') {
+      const messageDiv = document.getElementById(screenId.replace('-screen', '-message'));
+      if (messageDiv) {
+        const icon = type === 'success' ? 'fas fa-check-circle' : 
+                    type === 'error' ? 'fas fa-exclamation-circle' : 
+                    'fas fa-info-circle';
+        messageDiv.innerHTML = `<div class="message ${type}"><i class="${icon}"></i><span>${message}</span></div>`;
+      }
+    }
+
+    function showRegisterScreen() {
+      showScreen('register-screen');
+      document.getElementById('nickname-input').value = '';
+      document.getElementById('register-message').innerHTML = '';
+    }
+
+    function showVerifyScreen() {
+      showScreen('verify-screen');
+      document.getElementById('code-input').value = '';
+      document.getElementById('verify-message').innerHTML = '';
+    }
+
+    function showGameScreen(nickname) {
+      showScreen('game-screen');
+      document.getElementById('player-nickname').textContent = nickname;
+      updateBalance();
+    }
+
+    function checkUserStatus() {
+      fetch("/api/user_status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (!data.registered) {
+          showRegisterScreen();
+        } else if (!data.verified) {
+          showVerifyScreen();
+        } else {
+          showGameScreen(data.nickname);
+        }
+      })
+      .catch(err => {
+        showMessage('loading-screen', `Ошибка подключения: ${err.message}`, 'error');
+      });
+    }
+
+    function register() {
+      const nickname = document.getElementById('nickname-input').value.trim();
+      
+      if (!nickname) {
+        showMessage('register-screen', 'Пожалуйста, введите ваш игровой ник', 'error');
+        return;
+      }
+
+      if (nickname.length < 3 || nickname.length > 16) {
+        showMessage('register-screen', 'Ник должен содержать от 3 до 16 символов', 'error');
+        return;
+      }
+
+      if (!/^[a-zA-Z0-9_]+$/.test(nickname)) {
+        showMessage('register-screen', 'Ник может содержать только буквы, цифры и символ _', 'error');
+        return;
+      }
+
+      // Показываем загрузку
+      const btn = document.querySelector('#register-screen .btn-primary');
+      const originalText = btn.innerHTML;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Регистрация...';
+      btn.disabled = true;
+
+      fetch("/api/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id, nickname })
+      })
+      .then(res => res.json())
+      .then(data => {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+        
+        if (data.success) {
+          showMessage('register-screen', data.message, 'success');
+          setTimeout(() => showVerifyScreen(), 2000);
+        } else {
+          showMessage('register-screen', data.error, 'error');
+        }
+      })
+      .catch(err => {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+        showMessage('register-screen', `Ошибка: ${err.message}`, 'error');
+      });
+    }
+
+    function verify() {
+      const code = document.getElementById('code-input').value.trim();
+      
+      if (!code || code.length !== 6) {
+        showMessage('verify-screen', 'Введите 6-значный код из игры', 'error');
+        return;
+      }
+
+      if (!/^\d{6}$/.test(code)) {
+        showMessage('verify-screen', 'Код должен содержать только цифры', 'error');
+        return;
+      }
+
+      // Показываем загрузку
+      const btn = document.querySelector('#verify-screen .btn-primary');
+      const originalText = btn.innerHTML;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Проверка...';
+      btn.disabled = true;
+
+      fetch("/api/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id, code })
+      })
+      .then(res => res.json())
+      .then(data => {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+        
+        if (data.success) {
+          showMessage('verify-screen', data.message, 'success');
+          setTimeout(() => checkUserStatus(), 2000);
+        } else {
+          showMessage('verify-screen', data.error, 'error');
+        }
+      })
+      .catch(err => {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+        showMessage('verify-screen', `Ошибка: ${err.message}`, 'error');
+      });
+    }
+
+    function tap() {
+      if (!user_id) return;
+      
+      // Анимация кнопки
+      const tapBtn = document.querySelector('.tap-button');
+      const scoreEl = document.getElementById("score");
+      
+      // Вибрация для мобильных устройств
+      if (navigator.vibrate) {
+        navigator.vibrate(50);
+      }
+      
+      fetch("/api/tap", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.score !== undefined) {
+          scoreEl.textContent = data.score;
+          
+          // Анимация увеличения счета
+          scoreEl.style.transform = 'scale(1.1)';
+          setTimeout(() => {
+            scoreEl.style.transform = '';
+          }, 200);
+        } else {
+          console.error('Ошибка:', data.error);
+        }
+      })
+      .catch(err => {
+        console.error('Ошибка сети:', err.message);
+      });
+    }
+
+    function updateBalance() {
+      if (!user_id) return;
+      
+      const btn = document.querySelector('#game-screen .btn-info');
+      const icon = btn.querySelector('i');
+      icon.classList.add('fa-spin');
+      
+      fetch("/api/balance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id })
+      })
+      .then(res => res.json())
+      .then(data => {
+        document.getElementById("score").textContent = data.score;
+        icon.classList.remove('fa-spin');
+      })
+      .catch(err => {
+        console.error('Ошибка:', err.message);
+        icon.classList.remove('fa-spin');
+      });
+    }
+
+    // Автообновление счёта каждые 15 секунд
+    setInterval(() => {
+      if (currentScreen === 'game-screen') {
+        updateBalance();
+      }
+    }, 15000);
+
+    // Обработка клавиатуры
+    document.addEventListener('keydown', (e) => {
+      if (currentScreen === 'register-screen' && e.key === 'Enter') {
+        register();
+      } else if (currentScreen === 'verify-screen' && e.key === 'Enter') {
+        verify();
+      } else if (currentScreen === 'game-screen' && e.key === ' ') {
+        e.preventDefault();
+        tap();
+      }
+    });
+
+    // Предотвращение двойного тапа для зума
+    let lastTouchEnd = 0;
+    document.addEventListener('touchend', function (event) {
+      const now = (new Date()).getTime();
+      if (now - lastTouchEnd <= 300) {
+        event.preventDefault();
+      }
+      lastTouchEnd = now;
+    }, false);
+
+    // Предотвращение контекстного меню
+    document.addEventListener('contextmenu', function(e) {
+      e.preventDefault();
+    });
+
+    // Оптимизация для iOS Safari
+    if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
+      document.addEventListener('touchstart', function(){}, true);
+    }
+  </script>
+</body>
+</html>
