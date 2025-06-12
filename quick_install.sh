@@ -23,7 +23,19 @@ cd /var/www/minecraft
 
 # Копируем файлы проекта
 echo "📋 Копируем файлы..."
-cp -r /root/telegramminecraft/* . 2>/dev/null || cp /root/* . 2>/dev/null || echo "Скопируйте файлы app.py и templates/ в /var/www/minecraft"
+if [[ -d "/root/telegramminecraft" ]]; then
+    cp -r /root/telegramminecraft/* . 2>/dev/null
+    echo "✅ Файлы скопированы из /root/telegramminecraft"
+elif [[ -f "/root/app.py" ]]; then
+    cp /root/app.py . 2>/dev/null
+    cp -r /root/templates . 2>/dev/null
+    echo "✅ Файлы скопированы из /root"
+else
+    echo "⚠️ Файлы проекта не найдены!"
+    echo "Скопируйте файлы app.py и templates/ в /var/www/minecraft"
+    echo "Нажмите Enter когда файлы будут готовы..."
+    read
+fi
 
 # Настраиваем Nginx
 echo "🌐 Настраиваем Nginx..."

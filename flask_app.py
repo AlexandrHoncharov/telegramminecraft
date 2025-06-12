@@ -5,23 +5,15 @@ import time
 import sqlite3
 import os
 from flask import Flask, request, jsonify, render_template
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
-from telegram.ext import (
-    ApplicationBuilder,
-    CommandHandler,
-    ContextTypes,
-)
 from mcrcon import MCRcon
 
 # === НАСТРОЙКИ ===
-TELEGRAM_TOKEN = "7829543177:AAEiDyUhfXFDWjHxv9k8eaCwI2pZznLNJ3Q"
 RCON_HOST = "proxima.minerent.net"
 RCON_PORT = 25811
 RCON_PASSWORD = "sanumxxx"
-WEBAPP_URL = "https://univappschedule.ru"
 
 # === Flask приложение ===
-flask_app = Flask(__name__)
+app = Flask(__name__)
 
 # === База данных ===
 DB_PATH = "minecraft_clicker.db"
@@ -69,7 +61,7 @@ def init_database():
 def get_db_connection():
     """Получение подключения к базе данных"""
     conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row  # Для доступа к столбцам по имени
+    conn.row_factory = sqlite3.Row
     return conn
 
 def cleanup_expired_codes():
@@ -120,7 +112,6 @@ def create_user(telegram_id, nickname):
         conn.close()
         return True
     except sqlite3.IntegrityError:
-        # Пользователь уже существует
         conn.close()
         return False
 
@@ -155,7 +146,6 @@ def update_user_activity(telegram_id):
 
 def create_verification_code(telegram_id, nickname):
     """Создание кода верификации"""
-    # Удаляем старые коды для этого пользователя
     conn = get_db_connection()
     cursor = conn.cursor()
     
@@ -164,7 +154,6 @@ def create_verification_code(telegram_id, nickname):
         (telegram_id,)
     )
     
-    # Генерируем новый код
     code = ''.join(random.choices(string.digits, k=6))
     expires_at = time.time() + 600  # 10 минут
     
@@ -212,15 +201,12 @@ def get_user_stats():
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    # Общее количество пользователей
     cursor.execute("SELECT COUNT(*) FROM users")
     total_users = cursor.fetchone()[0]
     
-    # Количество верифицированных пользователей
     cursor.execute("SELECT COUNT(*) FROM users WHERE verified = 1")
     verified_users = cursor.fetchone()[0]
     
-    # Количество активных кодов
     cursor.execute("SELECT COUNT(*) FROM verification_codes WHERE expires_at > ?", (time.time(),))
     active_codes = cursor.fetchone()[0]
     
@@ -233,11 +219,11 @@ def get_user_stats():
     }
 
 # === Flask маршруты ===
-@flask_app.route("/")
+@app.route("/")
 def index():
     return render_template("index.html")
 
-@flask_app.route("/api/register", methods=["POST"])
+@app.route("/api/register", methods=["POST"])
 def register():
     """Регистрация пользователя и отправка кода в игру"""
     data = request.get_json()
@@ -247,19 +233,15 @@ def register():
     if not user_id or not nickname:
         return jsonify({"error": "Необходимо указать никнейм"}), 400
 
-    # Проверяем никнейм
     if len(nickname) < 3 or len(nickname) > 16:
         return jsonify({"error": "Никнейм должен быть от 3 до 16 символов"}), 400
 
-    # Очищаем устаревшие коды
     cleanup_expired_codes()
 
-    # Проверяем существующего пользователя
     user = get_user_by_telegram_id(user_id)
     if user:
         if user['verified']:
             return jsonify({"error": "Вы уже зарегистрированы и верифицированы"}), 400
-        # Обновляем никнейм если пользователь не верифицирован
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute(
@@ -269,13 +251,10 @@ def register():
         conn.commit()
         conn.close()
     else:
-        # Создаем нового пользователя
         create_user(user_id, nickname)
 
-    # Генерируем код верификации
     code = create_verification_code(user_id, nickname)
 
-    # Отправляем код в игру
     try:
         with MCRcon(RCON_HOST, RCON_PASSWORD, port=RCON_PORT) as mcr:
             mcr.command(f"title {nickname} title {{\"text\":\"КОД ВЕРИФИКАЦИИ\",\"color\":\"gold\",\"bold\":true}}")
@@ -290,7 +269,7 @@ def register():
         "message": "Код отправлен в игру! Введите его для подтверждения."
     })
 
-@flask_app.route("/api/verify", methods=["POST"])
+@app.route("/api/verify", methods=["POST"])
 def verify():
     """Верификация пользователя по коду"""
     data = request.get_json()
@@ -300,24 +279,19 @@ def verify():
     if not user_id or not code:
         return jsonify({"error": "Необходимо указать код"}), 400
 
-    # Очищаем устаревшие коды
     cleanup_expired_codes()
 
-    # Проверяем код
     code_data = get_verification_code(code)
     if not code_data:
         return jsonify({"error": "Неверный или устаревший код"}), 400
 
-    # Проверяем, что код принадлежит этому пользователю
     if code_data["telegram_id"] != user_id:
         return jsonify({"error": "Код не принадлежит вам"}), 400
 
-    # Проверяем, что код не устарел
     if time.time() > code_data["expires_at"]:
         delete_verification_code(code)
         return jsonify({"error": "Код истек. Запросите новый код."}), 400
 
-    # Верифицируем пользователя
     if verify_user(user_id):
         delete_verification_code(code)
         return jsonify({
@@ -327,7 +301,7 @@ def verify():
     else:
         return jsonify({"error": "Ошибка верификации"}), 500
 
-@flask_app.route("/api/user_status", methods=["POST"])
+@app.route("/api/user_status", methods=["POST"])
 def user_status():
     """Проверка статуса пользователя"""
     data = request.get_json()
@@ -340,7 +314,6 @@ def user_status():
     if not user:
         return jsonify({"registered": False, "verified": False})
 
-    # Обновляем время последней активности
     if user['verified']:
         update_user_activity(user_id)
 
@@ -350,7 +323,7 @@ def user_status():
         "nickname": user["nickname"]
     })
 
-@flask_app.route("/api/tap", methods=["POST"])
+@app.route("/api/tap", methods=["POST"])
 def tap():
     data = request.get_json()
     user_id = data.get("user_id")
@@ -360,8 +333,6 @@ def tap():
         return jsonify({"error": "Пользователь не верифицирован"}), 400
 
     nick = user["nickname"]
-    
-    # Обновляем активность
     update_user_activity(user_id)
 
     try:
@@ -373,7 +344,7 @@ def tap():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@flask_app.route("/api/balance", methods=["POST"])
+@app.route("/api/balance", methods=["POST"])
 def balance():
     data = request.get_json()
     user_id = data.get("user_id")
@@ -383,8 +354,6 @@ def balance():
         return jsonify({"score": 0})
 
     nick = user["nickname"]
-    
-    # Обновляем активность
     update_user_activity(user_id)
 
     try:
@@ -395,71 +364,19 @@ def balance():
     except:
         return jsonify({"score": 0})
 
-@flask_app.route("/api/stats", methods=["GET"])
+@app.route("/api/stats", methods=["GET"])
 def stats():
-    """Статистика пользователей (для админов)"""
+    """Статистика пользователей"""
     stats_data = get_user_stats()
     return jsonify(stats_data)
 
-# === Telegram-бот ===
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    user = get_user_by_telegram_id(user_id)
-    
-    if user and user['verified']:
-        await update.message.reply_text(
-            f"Привет, {user['nickname']}! 🎮\n"
-            f"Ты уже зарегистрирован и верифицирован.\n"
-            f"Нажми /clicker чтобы открыть игру!"
-        )
-    else:
-        await update.message.reply_text(
-            "Привет! 👋\n"
-            "Добро пожаловать в Minecraft Кликер!\n"
-            "Нажми /clicker чтобы начать регистрацию."
-        )
-
-async def open_clicker(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [[
-        InlineKeyboardButton(
-            "🚀 Открыть кликер",
-            web_app=WebAppInfo(url=WEBAPP_URL)
-        )
-    ]]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text("Нажми кнопку, чтобы открыть кликер:", reply_markup=reply_markup)
-
-# === Запуск Flask и Telegram-бота ===
-def run_flask():
-    """Запуск Flask сервера"""
-    flask_app.run(host="0.0.0.0", port=5000, debug=False, use_reloader=False)
-
 if __name__ == "__main__":
-    import threading
-    import asyncio
-    
     logging.basicConfig(level=logging.INFO)
     
-    # Инициализируем базу данных
     init_database()
-    
-    # Очищаем устаревшие коды при запуске
     cleanup_expired_codes()
     
-    print("✅ Запускаем Flask и Telegram-бот...")
+    print("✅ Flask сервер запущен")
     print(f"📊 Статистика: {get_user_stats()}")
     
-    # Запускаем Flask в отдельном потоке
-    flask_thread = threading.Thread(target=run_flask, daemon=True)
-    flask_thread.start()
-    
-    # Запускаем Telegram бота в основном потоке
-    app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("clicker", open_clicker))
-    
-    print("🤖 Telegram-бот запущен")
-    print("🌐 Flask сервер запущен на порту 5000")
-    
-    # Запускаем бота (это блокирующий вызов)
-    app.run_polling() 
+    app.run(host="0.0.0.0", port=5000, debug=False) 
