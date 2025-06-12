@@ -19,7 +19,7 @@ TELEGRAM_TOKEN = "7829543177:AAEiDyUhfXFDWjHxv9k8eaCwI2pZznLNJ3Q"
 RCON_HOST = "proxima.minerent.net"
 RCON_PORT = 25811
 RCON_PASSWORD = "sanumxxx"
-WEBAPP_URL = "https://9dfd-103-45-245-47.ngrok-free.app"
+WEBAPP_URL = "https://univappschedule.ru"
 
 # === База данных ===
 DB_PATH = "minecraft_clicker.db"
